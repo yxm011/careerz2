@@ -36,9 +36,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
       if (firebaseUser) {
+        const fallbackProfile: UserProfile = {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email ?? "",
+          displayName: firebaseUser.displayName ?? "",
+          role: "user",
+          photoURL: firebaseUser.photoURL ?? undefined,
+        };
         try {
           const docRef = doc(db, "users", firebaseUser.uid);
-          const snap = await getDoc(docRef);
+          const readPromise = getDoc(docRef);
+          const timeout = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("timeout")), 5000)
+          );
+          const snap = await Promise.race([readPromise, timeout]);
           if (snap.exists()) {
             const data = snap.data();
             setProfile({
@@ -49,21 +60,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               photoURL: data.photoURL ?? firebaseUser.photoURL ?? undefined,
             });
           } else {
-            setProfile({
-              uid: firebaseUser.uid,
-              email: firebaseUser.email ?? "",
-              displayName: firebaseUser.displayName ?? "",
-              role: "user",
-              photoURL: firebaseUser.photoURL ?? undefined,
-            });
+            setProfile(fallbackProfile);
           }
         } catch {
-          setProfile({
-            uid: firebaseUser.uid,
-            email: firebaseUser.email ?? "",
-            displayName: firebaseUser.displayName ?? "",
-            role: "user",
-          });
+          console.warn("Firestore profile read failed — using fallback");
+          setProfile(fallbackProfile);
         }
       } else {
         setProfile(null);

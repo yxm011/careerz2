@@ -28,13 +28,22 @@ export default function CompanySignup() {
     try {
       const cred = await createUserWithEmailAndPassword(auth, form.email, form.password);
       await updateProfile(cred.user, { displayName: form.companyName });
-      await setDoc(doc(db, "users", cred.user.uid), {
+      // Write profile to Firestore with timeout so it doesn't hang
+      const firestoreWrite = setDoc(doc(db, "users", cred.user.uid), {
         displayName: form.companyName,
         email: form.email,
         role: "company",
         industry: form.industry,
         createdAt: new Date().toISOString(),
       });
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Firestore write timed out")), 8000)
+      );
+      try {
+        await Promise.race([firestoreWrite, timeout]);
+      } catch {
+        console.warn("Firestore write failed or timed out — continuing anyway");
+      }
       navigate("/company");
     } catch (err: any) {
       setError(err.message ?? "Signup failed.");

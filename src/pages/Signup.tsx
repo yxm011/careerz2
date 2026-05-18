@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { createUserWithEmailAndPassword, updateProfile, signInWithPopup } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { useLanguage } from "@/i18n/LanguageContext";
-import { UserPlus, Lock, Mail, User } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { UserPlus, Lock, Mail, User, Building2 } from "lucide-react";
 
 export default function Signup() {
   const [fullName, setFullName] = useState("");
@@ -14,6 +15,15 @@ export default function Signup() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const { profile, loading: authLoading } = useAuth();
+
+  useEffect(() => {
+    if (!authLoading && profile) {
+      if (profile.role === "company") navigate("/company");
+      else if (profile.role === "admin") navigate("/admin");
+      else navigate("/dashboard");
+    }
+  }, [authLoading, profile, navigate]);
 
   const handleSignup = async () => {
     if (!fullName || !email || !password) {
@@ -25,12 +35,13 @@ export default function Signup() {
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(cred.user, { displayName: fullName });
-      await setDoc(doc(db, "users", cred.user.uid), {
+      const write = setDoc(doc(db, "users", cred.user.uid), {
         displayName: fullName,
         email,
         role: "user",
         createdAt: new Date().toISOString(),
       });
+      await Promise.race([write, new Promise((_, r) => setTimeout(() => r(), 8000))]).catch(() => {});
       navigate("/dashboard");
     } catch (err: any) {
       setError(err.message ?? "Sign up failed.");
@@ -41,7 +52,7 @@ export default function Signup() {
   const handleGoogleSignup = async () => {
     try {
       const cred = await signInWithPopup(auth, googleProvider);
-      await setDoc(
+      const write = setDoc(
         doc(db, "users", cred.user.uid),
         {
           displayName: cred.user.displayName ?? "",
@@ -51,6 +62,7 @@ export default function Signup() {
         },
         { merge: true }
       );
+      await Promise.race([write, new Promise((_, r) => setTimeout(() => r(), 8000))]).catch(() => {});
       navigate("/dashboard");
     } catch (err: any) {
       setError(err.message ?? "Google sign up failed.");
@@ -155,6 +167,15 @@ export default function Signup() {
             {t("nav.login")}
           </Link>
         </p>
+        <div className="w-full mt-4 pt-4 border-t border-gray-100">
+          <Link
+            to="/company/signup"
+            className="flex items-center justify-center gap-2 w-full border border-gray-200 text-gray-700 font-medium py-2 rounded-xl hover:bg-gray-50 transition text-sm"
+          >
+            <Building2 className="w-4 h-4" />
+            Sign up as Enterprise
+          </Link>
+        </div>
       </div>
     </div>
   );

@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { signInWithEmailAndPassword, signInWithPopup } from "firebase/auth";
-import { auth, googleProvider } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db, googleProvider } from "@/lib/firebase";
 import { useLanguage } from "@/i18n/LanguageContext";
-import { LogIn, Lock, Mail } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { LogIn, Lock, Mail, Building2 } from "lucide-react";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -12,6 +14,31 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const { profile, loading: authLoading } = useAuth();
+
+  useEffect(() => {
+    if (!authLoading && profile) {
+      navigateByRole(profile.role);
+    }
+  }, [authLoading, profile]);
+
+  function navigateByRole(role: string) {
+    if (role === "company") navigate("/company");
+    else if (role === "admin") navigate("/admin");
+    else navigate("/dashboard");
+  }
+
+  async function getRoleAndNavigate(uid: string) {
+    try {
+      const snap = await Promise.race([
+        getDoc(doc(db, "users", uid)),
+        new Promise<never>((_, r) => setTimeout(() => r(), 5000)),
+      ]);
+      navigateByRole(snap.exists() ? snap.data().role ?? "user" : "user");
+    } catch {
+      navigate("/dashboard");
+    }
+  }
 
   const validateEmail = (email: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -28,8 +55,8 @@ export default function Login() {
     setError("");
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      navigate("/dashboard");
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      await getRoleAndNavigate(cred.user.uid);
     } catch (err: any) {
       setError(err.message ?? "Sign in failed.");
     }
@@ -37,12 +64,14 @@ export default function Login() {
   };
 
   const handleGoogleSignIn = async () => {
+    setLoading(true);
     try {
-      await signInWithPopup(auth, googleProvider);
-      navigate("/dashboard");
+      const cred = await signInWithPopup(auth, googleProvider);
+      await getRoleAndNavigate(cred.user.uid);
     } catch (err: any) {
       setError(err.message ?? "Google sign in failed.");
     }
+    setLoading(false);
   };
 
   return (
@@ -137,11 +166,15 @@ export default function Login() {
             {t("nav.signup")}
           </Link>
         </p>
-        <p className="mt-2 text-center text-sm text-gray-500">
-          <Link to="/company/signup" className="text-primary font-medium hover:underline">
-            {t("auth.company_signup")}
+        <div className="w-full mt-4 pt-4 border-t border-gray-100">
+          <Link
+            to="/company/signup"
+            className="flex items-center justify-center gap-2 w-full border border-gray-200 text-gray-700 font-medium py-2 rounded-xl hover:bg-gray-50 transition text-sm"
+          >
+            <Building2 className="w-4 h-4" />
+            Sign up as Enterprise
           </Link>
-        </p>
+        </div>
       </div>
     </div>
   );

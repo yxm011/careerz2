@@ -11,8 +11,10 @@ import Workspace from "@/pages/Workspace";
 import CompanySignup from "@/pages/company/CompanySignup";
 import CompanyDashboard from "@/pages/company/CompanyDashboard";
 import CompanySimNew from "@/pages/company/CompanySimNew";
+import CompanySimEdit from "@/pages/company/CompanySimEdit";
 import CompanyAnalytics from "@/pages/company/CompanyAnalytics";
 import CompanySubmissions from "@/pages/company/CompanySubmissions";
+import SubmissionDetail from "@/pages/company/SubmissionDetail";
 import TalentPool from "@/pages/company/TalentPool";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import AdminTemplates from "@/pages/admin/AdminTemplates";
@@ -39,8 +41,10 @@ export default function App() {
           <Route path="/company/signup" element={<CompanySignup />} />
           <Route path="/company" element={<CompanyDashboard />} />
           <Route path="/company/simulations/new" element={<CompanySimNew />} />
+          <Route path="/company/simulations/:simId/edit" element={<CompanySimEdit />} />
           <Route path="/company/simulations/:id/analytics" element={<CompanyAnalytics />} />
           <Route path="/company/submissions" element={<CompanySubmissions />} />
+          <Route path="/company/submissions/:submissionId" element={<SubmissionDetail />} />
           <Route path="/company/talent-pool" element={<TalentPool />} />
 
           {/* Admin */}

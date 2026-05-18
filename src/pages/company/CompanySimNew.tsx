@@ -1,18 +1,48 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/hooks/useAuth";
 import { ArrowRight } from "lucide-react";
 
 export default function CompanySimNew() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const [form, setForm] = useState({ title: "", category: "", difficulty: "", duration: "", description: "" });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   function update(field: string, value: string) {
     setForm((p) => ({ ...p, [field]: value }));
   }
 
-  function handleCreate(e: React.FormEvent) {
+  async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    navigate("/company/simulations/new-draft/edit");
+    if (!profile) {
+      setError("You must be logged in to create simulations");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const simRef = await addDoc(collection(db, "simulations"), {
+        title: form.title,
+        category: form.category,
+        difficulty: form.difficulty,
+        duration: parseInt(form.duration) || 45,
+        description: form.description,
+        companyId: profile.uid,
+        companyName: profile.displayName,
+        status: "draft",
+        blocks: [],
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      navigate(`/company/simulations/${simRef.id}/edit`);
+    } catch (err: any) {
+      setError(err.message ?? "Failed to create simulation");
+      setLoading(false);
+    }
   }
 
   return (
@@ -64,8 +94,13 @@ export default function CompanySimNew() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
             <textarea placeholder="What candidates will do..." value={form.description} onChange={(e) => update("description", e.target.value)} rows={4} className="w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-200 bg-gray-50 text-sm resize-none" required />
           </div>
-          <button type="submit" className="w-full flex items-center justify-center gap-2 bg-gradient-to-b from-gray-700 to-gray-900 text-white font-medium py-2.5 rounded-xl hover:brightness-110 transition cursor-pointer border-none text-sm">
-            Continue to Builder <ArrowRight className="w-4 h-4" />
+          {error && (
+            <div className="text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              {error}
+            </div>
+          )}
+          <button type="submit" disabled={loading} className="w-full flex items-center justify-center gap-2 bg-gradient-to-b from-gray-700 to-gray-900 text-white font-medium py-2.5 rounded-xl hover:brightness-110 transition cursor-pointer border-none text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+            {loading ? "Creating..." : "Continue to Builder"} <ArrowRight className="w-4 h-4" />
           </button>
         </form>
       </div>

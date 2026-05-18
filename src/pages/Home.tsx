@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { useLanguage } from "@/i18n/LanguageContext";
+import { useAuth } from "@/hooks/useAuth";
 import {
   Briefcase,
   GraduationCap,
@@ -13,6 +14,11 @@ import {
 
 export default function Home() {
   const { t } = useLanguage();
+  const { profile } = useAuth();
+
+  const dashPath = profile
+    ? profile.role === "company" ? "/company" : profile.role === "admin" ? "/admin" : "/dashboard"
+    : null;
 
   const features = [
     { icon: GraduationCap, titleKey: "feature.learn.title", descKey: "feature.learn.desc" },
@@ -47,20 +53,32 @@ export default function Home() {
             {t("hero.subtitle")}
           </p>
           <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
-            <Link
-              to="/signup"
-              className="inline-flex items-center justify-center gap-2 bg-gradient-to-b from-gray-700 to-gray-900 text-white font-medium py-3 px-6 rounded-xl no-underline hover:brightness-110 transition text-sm"
-            >
-              {t("hero.cta")}
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-            <Link
-              to="/company/signup"
-              className="inline-flex items-center justify-center gap-2 border border-gray-200 text-gray-700 font-medium py-3 px-6 rounded-xl no-underline hover:bg-gray-50 transition text-sm"
-            >
-              <Building2 className="w-4 h-4" />
-              {t("hero.company_cta")}
-            </Link>
+            {dashPath ? (
+              <Link
+                to={dashPath}
+                className="inline-flex items-center justify-center gap-2 bg-gradient-to-b from-gray-700 to-gray-900 text-white font-medium py-3 px-6 rounded-xl no-underline hover:brightness-110 transition text-sm"
+              >
+                Go to Dashboard
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            ) : (
+              <>
+                <Link
+                  to="/signup"
+                  className="inline-flex items-center justify-center gap-2 bg-gradient-to-b from-gray-700 to-gray-900 text-white font-medium py-3 px-6 rounded-xl no-underline hover:brightness-110 transition text-sm"
+                >
+                  {t("hero.cta")}
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+                <Link
+                  to="/company/signup"
+                  className="inline-flex items-center justify-center gap-2 border border-gray-200 text-gray-700 font-medium py-3 px-6 rounded-xl no-underline hover:bg-gray-50 transition text-sm"
+                >
+                  <Building2 className="w-4 h-4" />
+                  {t("hero.company_cta")}
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </section>
@@ -160,10 +178,10 @@ export default function Home() {
           </p>
           <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
             <Link
-              to="/signup"
+              to={dashPath ?? "/signup"}
               className="inline-flex items-center justify-center bg-white text-gray-900 font-medium py-3 px-6 rounded-xl no-underline hover:bg-gray-100 transition text-sm"
             >
-              {t("cta.button")}
+              {dashPath ? "Go to Dashboard" : t("cta.button")}
             </Link>
             <Link
               to="/explore"
