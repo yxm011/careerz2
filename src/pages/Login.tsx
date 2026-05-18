@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { signInWithEmailAndPassword, signInWithPopup } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db, googleProvider } from "@/lib/firebase";
@@ -13,14 +13,20 @@ export default function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { t } = useLanguage();
   const { profile, loading: authLoading } = useAuth();
 
   useEffect(() => {
     if (!authLoading && profile) {
-      navigateByRole(profile.role);
+      const redirect = searchParams.get("redirect");
+      if (redirect) {
+        navigate(redirect);
+      } else {
+        navigateByRole(profile.role);
+      }
     }
-  }, [authLoading, profile]);
+  }, [authLoading, profile, searchParams, navigate]);
 
   function navigateByRole(role: string) {
     if (role === "company") navigate("/company");

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useAuth } from "@/hooks/useAuth";
 import { Clock, Building2, Users, BarChart3, CheckCircle2, ArrowRight } from "lucide-react";
 
 interface Block {
@@ -30,6 +31,7 @@ const diffColors: Record<string, string> = {
 
 export default function SimDetail() {
   const { id } = useParams();
+  const { profile } = useAuth();
   const [simulation, setSimulation] = useState<Simulation | null>(null);
   const [stats, setStats] = useState({ completions: 0, avgScore: 0 });
   const [loading, setLoading] = useState(true);
@@ -152,13 +154,23 @@ export default function SimDetail() {
         {/* Sidebar */}
         <div className="space-y-4">
           <div className="border border-gray-100 rounded-2xl bg-white p-6 space-y-4">
-            <Link
-              to={`/workspace/${id}`}
-              className="w-full flex items-center justify-center gap-2 bg-gradient-to-b from-gray-700 to-gray-900 text-white font-medium py-3 px-6 rounded-xl no-underline hover:brightness-110 transition text-sm"
-            >
-              Start Simulation
-              <ArrowRight className="w-4 h-4" />
-            </Link>
+            {profile ? (
+              <Link
+                to={`/workspace/${id}`}
+                className="w-full flex items-center justify-center gap-2 bg-gradient-to-b from-gray-700 to-gray-900 text-white font-medium py-3 px-6 rounded-xl no-underline hover:brightness-110 transition text-sm"
+              >
+                Start Simulation
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            ) : (
+              <Link
+                to={`/login?redirect=/workspace/${id}`}
+                className="w-full flex items-center justify-center gap-2 bg-gradient-to-b from-blue-600 to-blue-700 text-white font-medium py-3 px-6 rounded-xl no-underline hover:brightness-110 transition text-sm"
+              >
+                Login to Start
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            )}
             <div className="grid grid-cols-2 gap-4 pt-2">
               <div className="text-center">
                 <Users className="w-4 h-4 text-gray-400 mx-auto mb-1" />

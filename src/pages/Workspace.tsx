@@ -46,8 +46,13 @@ export default function Workspace() {
   const [isResuming, setIsResuming] = useState(false);
 
   useEffect(() => {
+    // Redirect to login if not authenticated
+    if (!profile) {
+      navigate(`/login?redirect=/workspace/${id}`);
+      return;
+    }
     if (id && profile) loadSimulationAndCreateSubmission();
-  }, [id, profile]);
+  }, [id, profile, navigate]);
 
   async function loadSimulationAndCreateSubmission() {
     if (!id || !profile) return;
