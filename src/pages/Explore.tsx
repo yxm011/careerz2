@@ -36,15 +36,14 @@ export default function Explore() {
 
   async function loadSimulations() {
     try {
-      const simsQuery = query(
-        collection(db, "simulations"),
-        where("status", "==", "active")
-      );
-      const snap = await getDocs(simsQuery);
-      const data = snap.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Simulation[];
+      // Load all simulations and filter in memory (temporary - add index for production)
+      const snap = await getDocs(collection(db, "simulations"));
+      const data = snap.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
+        .filter((sim: any) => sim.status === "active") as Simulation[];
       setSimulations(data);
     } catch (error) {
       console.error("Failed to load simulations:", error);
