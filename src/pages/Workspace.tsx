@@ -65,19 +65,23 @@ export default function Workspace() {
       }
       setSimulation(simData);
 
-      // Check for existing in-progress submission
+      // Check for existing in-progress submission (filter in memory to avoid composite index)
       const existingQuery = query(
         collection(db, "submissions"),
-        where("userId", "==", profile.uid),
-        where("simulationId", "==", id),
-        where("status", "==", "in_progress")
+        where("userId", "==", profile.uid)
       );
       const existingSnap = await getDocs(existingQuery);
+      
+      // Filter in memory for this simulation and in_progress status
+      const existingDocs = existingSnap.docs.filter(doc => {
+        const data = doc.data();
+        return data.simulationId === id && data.status === "in_progress";
+      });
 
-      if (!existingSnap.empty) {
+      if (existingDocs.length > 0) {
         // Resume existing submission
         setIsResuming(true);
-        const existingDoc = existingSnap.docs[0];
+        const existingDoc = existingDocs[0];
         const existingData = existingDoc.data();
         setSubmissionId(existingDoc.id);
         setAnswers(existingData.answers || {});
