@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { collection, getDocs, doc, getDoc } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc, query, where, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Search, Clock, Building2, BarChart3 } from "lucide-react";
 
@@ -34,32 +34,21 @@ export default function Explore() {
 
   async function loadSimulations() {
     try {
-      // Set a timeout to auto-retry if taking too long
-      const timeoutId = setTimeout(() => {
-        if (loading) {
-          console.warn("Firestore query taking longer than expected, forcing refresh...");
-          window.location.reload();
-        }
-      }, 8000);
-
-      // Load all simulations and filter in memory
-      const snap = await getDocs(collection(db, "simulations"));
-      clearTimeout(timeoutId);
+      const simsQuery = query(
+        collection(db, "simulations"),
+        where("status", "==", "active"),
+        limit(24)
+      );
+      const snap = await getDocs(simsQuery);
       
       const data = snap.docs
         .map(doc => ({
           id: doc.id,
           ...doc.data(),
-        }))
-        .filter((sim: any) => sim.status === "active") as Simulation[];
+        })) as Simulation[];
       setSimulations(data);
     } catch (error) {
       console.error("Failed to load simulations:", error);
-      // Auto-retry on error
-      setTimeout(() => {
-        console.log("Retrying...");
-        window.location.reload();
-      }, 1000);
     } finally {
       setLoading(false);
     }
@@ -144,6 +133,7 @@ export default function Explore() {
             <Link
               key={sim.id}
               to={`/sim/${sim.id}`}
+              state={{ simulation: sim }}
               onMouseEnter={() => prefetchSimulation(sim.id)}
               className="border border-gray-100 rounded-2xl bg-white p-5 hover:shadow-md transition-shadow no-underline group"
             >

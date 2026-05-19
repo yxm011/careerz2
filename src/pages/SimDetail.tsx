@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useLocation } from "react-router-dom";
 import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
@@ -31,21 +31,26 @@ const diffColors: Record<string, string> = {
 
 export default function SimDetail() {
   const { id } = useParams();
+  const location = useLocation();
   const { profile } = useAuth();
-  const [simulation, setSimulation] = useState<Simulation | null>(null);
+  const instantSimulation = (location.state as { simulation?: Simulation } | null)?.simulation || null;
+  const [simulation, setSimulation] = useState<Simulation | null>(instantSimulation);
   const [stats, setStats] = useState({ completions: 0, avgScore: 0 });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!instantSimulation);
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (id) {
-      // Show loading immediately
-      setLoading(true);
-      loadSimulation();
+      if (instantSimulation) {
+        loadStats();
+      } else {
+        setLoading(true);
+        loadSimulation(true);
+      }
     }
   }, [id]);
 
-  async function loadSimulation() {
+  async function loadSimulation(showLoading: boolean) {
     if (!id) return;
     try {
       const simDoc = await getDoc(doc(db, "simulations", id));
@@ -59,8 +64,17 @@ export default function SimDetail() {
         return;
       }
       setSimulation(data);
+      if (showLoading) setLoading(false);
+      loadStats();
+    } catch (err: any) {
+      setError(err.message ?? "Failed to load simulation");
+      if (showLoading) setLoading(false);
+    }
+  }
 
-      // Load stats
+  async function loadStats() {
+    if (!id) return;
+    try {
       const subsQuery = query(
         collection(db, "submissions"),
         where("simulationId", "==", id)
@@ -75,10 +89,8 @@ export default function SimDetail() {
         completions: completed.length,
         avgScore,
       });
-    } catch (err: any) {
-      setError(err.message ?? "Failed to load simulation");
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      console.error("Failed to load simulation stats:", err);
     }
   }
 
@@ -174,6 +186,7 @@ export default function SimDetail() {
             {profile ? (
               <Link
                 to={`/workspace/${id}`}
+                state={{ simulation }}
                 className="w-full flex items-center justify-center gap-2 bg-gradient-to-b from-gray-700 to-gray-900 text-white font-medium py-3 px-6 rounded-xl no-underline hover:brightness-110 transition text-sm"
               >
                 Start Simulation

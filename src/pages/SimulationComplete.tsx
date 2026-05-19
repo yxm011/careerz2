@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
-import { doc, getDoc, getDocFromCache, getDocFromServer } from "firebase/firestore";
+import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
+import { doc, getDocFromCache, getDocFromServer } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
 import { Trophy, Share2, Download, ArrowRight, CheckCircle2 } from "lucide-react";
@@ -9,24 +9,27 @@ interface Submission {
   simulationTitle: string;
   companyName: string;
   score: number;
-  submittedAt: any;
+  submittedAt?: any;
 }
 
 export default function SimulationComplete() {
   const { submissionId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { profile } = useAuth();
-  const [submission, setSubmission] = useState<Submission | null>(null);
-  const [loading, setLoading] = useState(true);
+  const instantSubmission = location.state as Submission | null;
+  const [submission, setSubmission] = useState<Submission | null>(
+    instantSubmission?.simulationTitle ? instantSubmission : null
+  );
+  const [loading, setLoading] = useState(!instantSubmission?.simulationTitle);
 
   useEffect(() => {
-    if (submissionId && profile) loadSubmission();
+    if (submissionId && profile) loadSubmission(!instantSubmission?.simulationTitle);
   }, [submissionId, profile]);
 
-  async function loadSubmission() {
+  async function loadSubmission(redirectOnMissing = true) {
     if (!submissionId || !profile) return;
     try {
-      // Try cache first for instant display
       let snap;
       try {
         snap = await getDocFromCache(doc(db, "submissions", submissionId));
@@ -37,21 +40,20 @@ export default function SimulationComplete() {
       }
       
       if (!snap.exists()) {
-        navigate("/dashboard");
+        if (redirectOnMissing) navigate("/dashboard");
         return;
       }
       const data = snap.data() as Submission;
       
-      // Verify this submission belongs to the user
       if (snap.data().userId !== profile.uid) {
-        navigate("/dashboard");
+        if (redirectOnMissing) navigate("/dashboard");
         return;
       }
       
       setSubmission(data);
     } catch (error) {
       console.error("Failed to load submission:", error);
-      navigate("/dashboard");
+      if (redirectOnMissing) navigate("/dashboard");
     } finally {
       setLoading(false);
     }
@@ -59,7 +61,6 @@ export default function SimulationComplete() {
 
   function shareOnLinkedIn() {
     const text = `I just completed "${submission?.simulationTitle}" simulation by ${submission?.companyName} and scored ${submission?.score}%! 🎉`;
-    const url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(window.location.origin)}`;
     window.open(`https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(text)}`, '_blank');
   }
 

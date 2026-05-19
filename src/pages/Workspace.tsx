@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
-import { doc, getDoc, updateDoc, addDoc, collection, query, where, getDocs, serverTimestamp, getDocFromCache, getDocFromServer } from "firebase/firestore";
+import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
+import { doc, setDoc, collection, getDocs, serverTimestamp, getDocFromCache, getDocFromServer } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -33,21 +33,26 @@ interface Simulation {
   difficulty: string;
   duration: number;
   description: string;
-  blocks: Block[];
+  blocks?: Block[];
   status: string;
 }
 
 export default function Workspace() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { profile } = useAuth();
+  const instantSimulation = (location.state as { simulation?: Simulation } | null)?.simulation || null;
+  const instantSimulationHasBlocks = !!instantSimulation?.blocks?.length;
   
-  const [simulation, setSimulation] = useState<Simulation | null>(null);
+  const [simulation, setSimulation] = useState<Simulation | null>(
+    instantSimulationHasBlocks ? instantSimulation : null
+  );
   const [submissionId, setSubmissionId] = useState<string | null>(null);
   const [currentBlock, setCurrentBlock] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [completedBlocks, setCompletedBlocks] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!instantSimulationHasBlocks);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [isResuming, setIsResuming] = useState(false);
@@ -59,10 +64,16 @@ export default function Workspace() {
       navigate(`/login?redirect=/workspace/${id}`);
       return;
     }
-    if (id && profile) loadSimulationAndCreateSubmission();
+    if (id && profile) {
+      if (instantSimulationHasBlocks && instantSimulation) {
+        setupSubmission(instantSimulation);
+      } else {
+        loadSimulationAndCreateSubmission(true);
+      }
+    }
   }, [id, profile, navigate]);
 
-  async function loadSimulationAndCreateSubmission() {
+  async function loadSimulationAndCreateSubmission(showLoading: boolean) {
     if (!id || !profile) return;
     try {
       // Try cache first for instant load
@@ -85,59 +96,49 @@ export default function Workspace() {
         setError("This simulation is not available");
         return;
       }
-      setSimulation(simData);
-
-      // Check for existing in-progress submission (filter in memory to avoid composite index)
-      const existingQuery = query(
-        collection(db, "submissions"),
-        where("userId", "==", profile.uid)
-      );
-      const existingSnap = await getDocs(existingQuery);
-      
-      // Filter in memory for this simulation and in_progress status
-      const existingDocs = existingSnap.docs.filter(doc => {
-        const data = doc.data();
-        return data.simulationId === id && data.status === "in_progress";
-      });
-
-      if (existingDocs.length > 0) {
-        // Resume existing submission
-        setIsResuming(true);
-        const existingDoc = existingDocs[0];
-        const existingData = existingDoc.data();
-        setSubmissionId(existingDoc.id);
-        setAnswers(existingData.answers || {});
-        
-        // Restore completed blocks based on answers
-        const completed = new Set<string>();
-        Object.keys(existingData.answers || {}).forEach(blockId => {
-          if (existingData.answers[blockId]) {
-            completed.add(blockId);
-          }
-        });
-        setCompletedBlocks(completed);
-      } else {
-        // Create new submission
-        const submissionRef = await addDoc(collection(db, "submissions"), {
-          userId: profile.uid,
-          userName: profile.displayName || profile.email,
-          simulationId: id,
-          simulationTitle: simData.title,
-          companyId: simData.companyId,
-          companyName: simData.companyName,
-          status: "in_progress",
-          progress: 0,
-          answers: {},
-          score: 0,
-          startedAt: serverTimestamp(),
-          submittedAt: null,
-        });
-        setSubmissionId(submissionRef.id);
-      }
+      const blocks = await loadBlocks(simData);
+      const fullSimulation = { ...simData, blocks };
+      setSimulation(fullSimulation);
+      if (showLoading) setLoading(false);
+      setupSubmission(fullSimulation);
     } catch (err: any) {
       setError(err.message ?? "Failed to load simulation");
-    } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
+    }
+  }
+
+  async function loadBlocks(simData: Simulation) {
+    if (!id) return simData.blocks || [];
+    const blocksSnap = await getDocs(collection(db, "simulations", id, "blocks"));
+    const subcollectionBlocks = blocksSnap.docs
+      .map((blockDoc) => blockDoc.data() as Block)
+      .sort((a, b) => a.order - b.order);
+    return subcollectionBlocks.length > 0 ? subcollectionBlocks : simData.blocks || [];
+  }
+
+  async function setupSubmission(simData: Simulation) {
+    if (!id || !profile) return;
+    try {
+      const submissionRef = doc(collection(db, "submissions"));
+      setSubmissionId(submissionRef.id);
+      setDoc(submissionRef, {
+        userId: profile.uid,
+        userName: profile.displayName || profile.email,
+        simulationId: id,
+        simulationTitle: simData.title,
+        companyId: simData.companyId,
+        companyName: simData.companyName,
+        status: "in_progress",
+        progress: 0,
+        answers: {},
+        score: 0,
+        startedAt: serverTimestamp(),
+        submittedAt: null,
+      }).catch((err) => {
+        console.error("Failed to create submission:", err);
+      });
+    } catch (err: any) {
+      console.error("Failed to prepare submission:", err);
     }
   }
 
@@ -145,13 +146,14 @@ export default function Workspace() {
     if (!submissionId) return;
     const newAnswers = { ...answers, [blockId]: answer };
     setAnswers(newAnswers);
+    const blocks = simulation?.blocks || [];
     
     // Save to Firestore
     try {
-      await updateDoc(doc(db, "submissions", submissionId), {
+      await setDoc(doc(db, "submissions", submissionId), {
         answers: newAnswers,
-        progress: Math.round((completedBlocks.size / (simulation?.blocks.length || 1)) * 100),
-      });
+        progress: Math.round((completedBlocks.size / (blocks.length || 1)) * 100),
+      }, { merge: true });
     } catch (error) {
       console.error("Failed to save answer:", error);
     }
@@ -159,14 +161,16 @@ export default function Workspace() {
 
   function markComplete() {
     if (!simulation) return;
-    const block = simulation.blocks[currentBlock];
+    const block = simulation.blocks?.[currentBlock];
+    if (!block) return;
     setCompletedBlocks((prev) => new Set([...prev, block.id]));
   }
 
   function handleNext() {
     if (!simulation) return;
+    const blocks = simulation.blocks || [];
     markComplete();
-    if (currentBlock < simulation.blocks.length - 1) {
+    if (currentBlock < blocks.length - 1) {
       setCurrentBlock(currentBlock + 1);
     }
   }
@@ -178,12 +182,13 @@ export default function Workspace() {
   async function handleSubmit() {
     if (!submissionId || !simulation) return;
     setSubmitting(true);
+    const blocks = simulation.blocks || [];
     
     // Calculate score with auto-grading for multiple choice
     let totalPoints = 0;
     let earnedPoints = 0;
     
-    simulation.blocks.forEach(block => {
+    blocks.forEach(block => {
       totalPoints += 1;
       
       if (block.type === "multiple_choice" && block.correctAnswer !== undefined) {
@@ -220,16 +225,22 @@ export default function Workspace() {
     const score = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
     
     // Navigate immediately (optimistic UI)
-    navigate(`/complete/${submissionId}`);
+    navigate(`/complete/${submissionId}`, {
+      state: {
+        simulationTitle: simulation.title,
+        companyName: simulation.companyName,
+        score,
+      },
+    });
     
     // Update in background
     try {
-      await updateDoc(doc(db, "submissions", submissionId), {
+      await setDoc(doc(db, "submissions", submissionId), {
         status: "completed",
         progress: 100,
         score,
         submittedAt: serverTimestamp(),
-      });
+      }, { merge: true });
     } catch (err: any) {
       console.error("Failed to submit:", err);
       // Already navigated, so just log error
@@ -257,7 +268,9 @@ export default function Workspace() {
     );
   }
 
-  if (!simulation.blocks || simulation.blocks.length === 0) {
+  const blocks = simulation.blocks || [];
+
+  if (blocks.length === 0) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-10">
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-yellow-700 mb-4">
@@ -270,8 +283,8 @@ export default function Workspace() {
     );
   }
 
-  const block = simulation.blocks[currentBlock];
-  const progress = (completedBlocks.size / simulation.blocks.length) * 100;
+  const block = blocks[currentBlock];
+  const progress = (completedBlocks.size / blocks.length) * 100;
 
   return (
     <div className="min-h-[calc(100vh-4rem)]">
@@ -280,7 +293,7 @@ export default function Workspace() {
         <div className="bg-blue-50 border-b border-blue-200 py-2 px-4">
           <div className="max-w-7xl mx-auto">
             <p className="text-sm text-blue-700">
-              ✓ Resuming your progress - {completedBlocks.size} of {simulation?.blocks.length} sections completed
+              ✓ Resuming your progress - {completedBlocks.size} of {blocks.length} sections completed
             </p>
           </div>
         </div>
@@ -301,7 +314,7 @@ export default function Workspace() {
               <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${progress}%` }} />
             </div>
             <span className="text-xs font-medium text-gray-500">
-              {completedBlocks.size}/{simulation.blocks.length}
+              {completedBlocks.size}/{blocks.length}
             </span>
           </div>
         </div>
@@ -314,7 +327,7 @@ export default function Workspace() {
             <div className="border border-gray-100 rounded-2xl bg-white p-4">
               <h3 className="text-sm font-semibold text-gray-900 mb-3">Sections</h3>
               <div className="space-y-1">
-                {simulation.blocks.map((b, i) => (
+                {blocks.map((b, i) => (
                   <button
                     key={b.id}
                     onClick={() => setCurrentBlock(i)}
@@ -350,7 +363,7 @@ export default function Workspace() {
                     <h2 className="text-lg font-semibold text-gray-900">Step {currentBlock + 1}</h2>
                   </div>
                   <span className="text-sm text-gray-400">
-                    {currentBlock + 1} of {simulation.blocks.length}
+                    {currentBlock + 1} of {blocks.length}
                   </span>
                 </div>
               </div>
@@ -636,7 +649,7 @@ export default function Workspace() {
                     <ChevronLeft className="w-4 h-4" />
                     Previous
                   </button>
-                  {currentBlock === simulation.blocks.length - 1 ? (
+                  {currentBlock === blocks.length - 1 ? (
                     <button
                       onClick={handleSubmit}
                       disabled={submitting}

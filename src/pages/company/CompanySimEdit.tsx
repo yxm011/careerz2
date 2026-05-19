@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { doc, getDoc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
+import { collection, deleteDoc, deleteField, doc, getDoc, getDocs, serverTimestamp, updateDoc, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
 import { ArrowLeft, Save, Eye, Plus, Trash2, GripVertical } from "lucide-react";
@@ -30,6 +30,11 @@ interface Simulation {
   companyId: string;
 }
 
+function simulationMetadata(simulation: Simulation) {
+  const { blocks, ...metadata } = simulation;
+  return metadata;
+}
+
 export default function CompanySimEdit() {
   const { simId } = useParams<{ simId: string }>();
   const navigate = useNavigate();
@@ -57,7 +62,14 @@ export default function CompanySimEdit() {
         setError("You don't have permission to edit this simulation");
         return;
       }
-      setSimulation(data);
+      const blocksSnap = await getDocs(collection(db, "simulations", simId, "blocks"));
+      const subcollectionBlocks = blocksSnap.docs
+        .map((blockDoc) => blockDoc.data() as Block)
+        .sort((a, b) => a.order - b.order);
+      setSimulation({
+        ...data,
+        blocks: subcollectionBlocks.length > 0 ? subcollectionBlocks : data.blocks || [],
+      });
     } catch (err: any) {
       setError(err.message ?? "Failed to load simulation");
     } finally {
@@ -69,8 +81,11 @@ export default function CompanySimEdit() {
     if (!simId || !simulation) return;
     setSaving(true);
     try {
+      await saveBlocks();
       await updateDoc(doc(db, "simulations", simId), {
-        ...simulation,
+        ...simulationMetadata(simulation),
+        blocks: deleteField(),
+        blockCount: simulation.blocks.length,
         updatedAt: serverTimestamp(),
       });
       alert("Simulation saved!");
@@ -85,8 +100,11 @@ export default function CompanySimEdit() {
     if (!simId || !simulation) return;
     setSaving(true);
     try {
+      await saveBlocks();
       await updateDoc(doc(db, "simulations", simId), {
-        ...simulation,
+        ...simulationMetadata(simulation),
+        blocks: deleteField(),
+        blockCount: simulation.blocks.length,
         status: "active",
         updatedAt: serverTimestamp(),
       });
@@ -104,12 +122,30 @@ export default function CompanySimEdit() {
     }
     setSaving(true);
     try {
+      const blocksSnap = await getDocs(collection(db, "simulations", simId, "blocks"));
+      const batch = writeBatch(db);
+      blocksSnap.docs.forEach((blockDoc) => batch.delete(blockDoc.ref));
+      await batch.commit();
       await deleteDoc(doc(db, "simulations", simId));
       navigate("/company");
     } catch (err: any) {
       setError(err.message ?? "Failed to delete");
       setSaving(false);
     }
+  }
+
+  async function saveBlocks() {
+    if (!simId || !simulation) return;
+    const existingBlocksSnap = await getDocs(collection(db, "simulations", simId, "blocks"));
+    const batch = writeBatch(db);
+    existingBlocksSnap.docs.forEach((blockDoc) => batch.delete(blockDoc.ref));
+    simulation.blocks.forEach((block, index) => {
+      batch.set(doc(db, "simulations", simId, "blocks", block.id), {
+        ...block,
+        order: index,
+      });
+    });
+    await batch.commit();
   }
 
   function addBlock(type: Block["type"]) {

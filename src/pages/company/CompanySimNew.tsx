@@ -34,7 +34,7 @@ export default function CompanySimNew() {
         companyId: profile.uid,
         companyName: profile.displayName,
         status: "draft",
-        blocks: [],
+        blockCount: 0,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
