@@ -7,12 +7,16 @@ import { ArrowLeft, Save, Eye, Plus, Trash2, GripVertical } from "lucide-react";
 
 interface Block {
   id: string;
-  type: "text" | "question" | "code" | "multiple_choice" | "file_upload";
+  type: "text" | "question" | "code" | "multiple_choice" | "file_upload" | "scenario" | "drag_drop";
   content: string;
   order: number;
   options?: string[];
   correctAnswer?: number;
   modelAnswer?: string;
+  choices?: { label: string; outcome: string; isCorrect?: boolean }[];
+  items?: string[];
+  categories?: string[];
+  correctMatches?: Record<string, string>;
 }
 
 interface Simulation {
@@ -247,6 +251,18 @@ export default function CompanySimEdit() {
             >
               + Multiple Choice
             </button>
+            <button
+              onClick={() => addBlock("scenario")}
+              className="text-xs bg-purple-100 hover:bg-purple-200 text-purple-700 px-3 py-1.5 rounded-lg transition font-medium"
+            >
+              + Scenario
+            </button>
+            <button
+              onClick={() => addBlock("drag_drop")}
+              className="text-xs bg-green-100 hover:bg-green-200 text-green-700 px-3 py-1.5 rounded-lg transition font-medium"
+            >
+              + Drag & Drop
+            </button>
           </div>
         </div>
 
@@ -280,8 +296,19 @@ export default function CompanySimEdit() {
                       className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white text-sm resize-none"
                     />
                     <div className="space-y-2">
-                      <label className="text-xs font-medium text-gray-600">Options:</label>
-                      {(block.options || ["", "", "", ""]).map((option, i) => (
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-medium text-gray-600">Options:</label>
+                        <button
+                          onClick={() => {
+                            const newOptions = [...(block.options || []), ""];
+                            updateBlockField(block.id, "options", newOptions);
+                          }}
+                          className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded transition"
+                        >
+                          + Add Option
+                        </button>
+                      </div>
+                      {(block.options || ["", ""]).map((option, i) => (
                         <div key={i} className="flex items-center gap-2">
                           <input
                             type="radio"
@@ -294,16 +321,33 @@ export default function CompanySimEdit() {
                             type="text"
                             value={option}
                             onChange={(e) => {
-                              const newOptions = [...(block.options || ["", "", "", ""])];
+                              const newOptions = [...(block.options || [])];
                               newOptions[i] = e.target.value;
                               updateBlockField(block.id, "options", newOptions);
                             }}
                             placeholder={`Option ${i + 1}`}
                             className="flex-1 px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white text-sm"
                           />
+                          {(block.options?.length || 0) > 2 && (
+                            <button
+                              onClick={() => {
+                                const newOptions = (block.options || []).filter((_, idx) => idx !== i);
+                                updateBlockField(block.id, "options", newOptions);
+                                // Reset correct answer if it was the deleted option
+                                if (block.correctAnswer === i) {
+                                  updateBlockField(block.id, "correctAnswer", undefined);
+                                } else if (block.correctAnswer !== undefined && block.correctAnswer > i) {
+                                  updateBlockField(block.id, "correctAnswer", block.correctAnswer - 1);
+                                }
+                              }}
+                              className="text-red-500 hover:text-red-700 p-1"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       ))}
-                      <p className="text-xs text-gray-500 mt-1">Select the correct answer with the radio button</p>
+                      <p className="text-xs text-gray-500 mt-1">Select the correct answer with the radio button (min 2 options)</p>
                     </div>
                     <div>
                       <label className="text-xs font-medium text-gray-600 block mb-1">Model Answer (optional):</label>
@@ -314,6 +358,197 @@ export default function CompanySimEdit() {
                         rows={2}
                         className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white text-sm resize-none"
                       />
+                    </div>
+                  </div>
+                ) : block.type === "scenario" ? (
+                  <div className="space-y-3">
+                    <textarea
+                      value={block.content}
+                      onChange={(e) => updateBlock(block.id, e.target.value)}
+                      placeholder="Describe the scenario/situation..."
+                      rows={3}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white text-sm resize-none"
+                    />
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-medium text-gray-600">Choices:</label>
+                        <button
+                          onClick={() => {
+                            const newChoices = [...(block.choices || []), { label: "", outcome: "", isCorrect: false }];
+                            updateBlockField(block.id, "choices", newChoices);
+                          }}
+                          className="text-xs bg-purple-100 hover:bg-purple-200 text-purple-700 px-2 py-1 rounded transition"
+                        >
+                          + Add Choice
+                        </button>
+                      </div>
+                      {(block.choices || [{ label: "", outcome: "", isCorrect: false }, { label: "", outcome: "", isCorrect: false }]).map((choice, i) => (
+                        <div key={i} className="border border-gray-200 rounded-lg p-3 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={choice.isCorrect || false}
+                              onChange={(e) => {
+                                const newChoices = [...(block.choices || [])];
+                                newChoices[i] = { ...newChoices[i], isCorrect: e.target.checked };
+                                updateBlockField(block.id, "choices", newChoices);
+                              }}
+                              className="w-4 h-4 text-green-600"
+                            />
+                            <input
+                              type="text"
+                              value={choice.label}
+                              onChange={(e) => {
+                                const newChoices = [...(block.choices || [])];
+                                newChoices[i] = { ...newChoices[i], label: e.target.value };
+                                updateBlockField(block.id, "choices", newChoices);
+                              }}
+                              placeholder={`Choice ${i + 1}`}
+                              className="flex-1 px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white text-sm"
+                            />
+                            {(block.choices?.length || 0) > 2 && (
+                              <button
+                                onClick={() => {
+                                  const newChoices = (block.choices || []).filter((_, idx) => idx !== i);
+                                  updateBlockField(block.id, "choices", newChoices);
+                                }}
+                                className="text-red-500 hover:text-red-700 p-1"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                          <textarea
+                            value={choice.outcome}
+                            onChange={(e) => {
+                              const newChoices = [...(block.choices || [])];
+                              newChoices[i] = { ...newChoices[i], outcome: e.target.value };
+                              updateBlockField(block.id, "choices", newChoices);
+                            }}
+                            placeholder="What happens if they choose this? (outcome/feedback)"
+                            rows={2}
+                            className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white text-sm resize-none"
+                          />
+                          <p className="text-xs text-gray-500">✓ Check if this is a good/correct choice</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : block.type === "drag_drop" ? (
+                  <div className="space-y-3">
+                    <textarea
+                      value={block.content}
+                      onChange={(e) => updateBlock(block.id, e.target.value)}
+                      placeholder="Instructions (e.g., 'Match each skill to the correct department')"
+                      rows={2}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white text-sm resize-none"
+                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-medium text-gray-600">Items to Match:</label>
+                          <button
+                            onClick={() => {
+                              const newItems = [...(block.items || []), ""];
+                              updateBlockField(block.id, "items", newItems);
+                            }}
+                            className="text-xs bg-green-100 hover:bg-green-200 text-green-700 px-2 py-1 rounded transition"
+                          >
+                            + Add
+                          </button>
+                        </div>
+                        {(block.items || ["", ""]).map((item, i) => (
+                          <div key={i} className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={item}
+                              onChange={(e) => {
+                                const newItems = [...(block.items || [])];
+                                newItems[i] = e.target.value;
+                                updateBlockField(block.id, "items", newItems);
+                              }}
+                              placeholder={`Item ${i + 1}`}
+                              className="flex-1 px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white text-sm"
+                            />
+                            {(block.items?.length || 0) > 2 && (
+                              <button
+                                onClick={() => {
+                                  const newItems = (block.items || []).filter((_, idx) => idx !== i);
+                                  updateBlockField(block.id, "items", newItems);
+                                }}
+                                className="text-red-500 hover:text-red-700 p-1"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-medium text-gray-600">Categories:</label>
+                          <button
+                            onClick={() => {
+                              const newCategories = [...(block.categories || []), ""];
+                              updateBlockField(block.id, "categories", newCategories);
+                            }}
+                            className="text-xs bg-green-100 hover:bg-green-200 text-green-700 px-2 py-1 rounded transition"
+                          >
+                            + Add
+                          </button>
+                        </div>
+                        {(block.categories || ["", ""]).map((category, i) => (
+                          <div key={i} className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={category}
+                              onChange={(e) => {
+                                const newCategories = [...(block.categories || [])];
+                                newCategories[i] = e.target.value;
+                                updateBlockField(block.id, "categories", newCategories);
+                              }}
+                              placeholder={`Category ${i + 1}`}
+                              className="flex-1 px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white text-sm"
+                            />
+                            {(block.categories?.length || 0) > 2 && (
+                              <button
+                                onClick={() => {
+                                  const newCategories = (block.categories || []).filter((_, idx) => idx !== i);
+                                  updateBlockField(block.id, "categories", newCategories);
+                                }}
+                                className="text-red-500 hover:text-red-700 p-1"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <p className="text-xs font-medium text-gray-700 mb-2">Correct Matches:</p>
+                      <p className="text-xs text-gray-500">Users will drag items to categories. Define correct matches below:</p>
+                      <div className="mt-2 space-y-1">
+                        {(block.items || []).map((item, i) => (
+                          <div key={i} className="flex items-center gap-2 text-xs">
+                            <span className="text-gray-600">{item || `Item ${i + 1}`}</span>
+                            <span>→</span>
+                            <select
+                              value={block.correctMatches?.[item] || ""}
+                              onChange={(e) => {
+                                const newMatches = { ...(block.correctMatches || {}), [item]: e.target.value };
+                                updateBlockField(block.id, "correctMatches", newMatches);
+                              }}
+                              className="px-2 py-1 rounded border border-gray-200 text-xs"
+                            >
+                              <option value="">Select category...</option>
+                              {(block.categories || []).map((cat, j) => (
+                                <option key={j} value={cat}>{cat || `Category ${j + 1}`}</option>
+                              ))}
+                            </select>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 ) : (

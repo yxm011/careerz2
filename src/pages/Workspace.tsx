@@ -19,6 +19,10 @@ interface Block {
   options?: string[];
   correctAnswer?: number;
   modelAnswer?: string;
+  choices?: { label: string; outcome: string; isCorrect?: boolean }[];
+  items?: string[];
+  categories?: string[];
+  correctMatches?: Record<string, string>;
 }
 
 interface Simulation {
@@ -418,6 +422,84 @@ export default function Workspace() {
                         <p className="text-sm text-blue-800">{block.modelAnswer}</p>
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* Scenario Block */}
+                {block.type === "scenario" && (
+                  <div className="space-y-4">
+                    <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
+                      <p className="text-xs font-semibold text-purple-900 mb-2">📋 Scenario:</p>
+                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{block.content}</p>
+                    </div>
+                    <p className="font-medium text-gray-900">What would you do?</p>
+                    <div className="space-y-3">
+                      {block.choices?.map((choice, i) => {
+                        const isSelected = answers[block.id] === String(i);
+                        const hasAnswered = answers[block.id] !== undefined;
+                        const isCorrect = choice.isCorrect;
+                        
+                        return (
+                          <button
+                            key={i}
+                            onClick={() => saveAnswer(block.id, String(i))}
+                            disabled={hasAnswered}
+                            className={`w-full text-left p-4 rounded-xl border transition ${
+                              hasAnswered && isSelected && isCorrect
+                                ? "border-green-500 bg-green-50"
+                                : hasAnswered && isSelected && !isCorrect
+                                ? "border-yellow-500 bg-yellow-50"
+                                : isSelected
+                                ? "border-primary bg-blue-50"
+                                : "border-gray-200 hover:bg-gray-50 bg-white"
+                            } ${hasAnswered ? "cursor-not-allowed" : "cursor-pointer"}`}
+                          >
+                            <p className="text-sm font-medium text-gray-900 mb-2">{choice.label}</p>
+                            {hasAnswered && isSelected && (
+                              <div className={`text-xs mt-2 p-2 rounded ${
+                                isCorrect ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
+                              }`}>
+                                <p className="font-medium mb-1">{isCorrect ? "✓ Good choice!" : "⚠️ Consider this:"}</p>
+                                <p>{choice.outcome}</p>
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Drag & Drop Block */}
+                {block.type === "drag_drop" && (
+                  <div className="space-y-4">
+                    <p className="font-medium text-gray-900">{block.content}</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <p className="text-xs font-semibold text-gray-600 mb-2">Items:</p>
+                        {block.items?.map((item, i) => (
+                          <div
+                            key={i}
+                            className="p-3 bg-white border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 cursor-move hover:border-primary transition"
+                          >
+                            {item}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-xs font-semibold text-gray-600 mb-2">Categories:</p>
+                        {block.categories?.map((category, i) => (
+                          <div key={i} className="p-3 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg min-h-[60px]">
+                            <p className="text-xs font-semibold text-gray-600 mb-2">{category}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                      <p className="text-xs text-blue-700">
+                        💡 <strong>Note:</strong> Full drag & drop functionality coming soon! For now, this is a preview of the matching exercise.
+                      </p>
+                    </div>
                   </div>
                 )}
 
