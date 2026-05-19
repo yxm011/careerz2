@@ -38,7 +38,11 @@ export default function SimDetail() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (id) loadSimulation();
+    if (id) {
+      // Show loading immediately
+      setLoading(true);
+      loadSimulation();
+    }
   }, [id]);
 
   async function loadSimulation() {
@@ -81,7 +85,20 @@ export default function SimDetail() {
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-10">
-        <p className="text-center text-gray-400">Loading...</p>
+        <div className="grid lg:grid-cols-3 gap-8 animate-pulse">
+          <div className="lg:col-span-2">
+            <div className="h-8 bg-gray-200 rounded w-3/4 mb-4"></div>
+            <div className="h-4 bg-gray-200 rounded w-1/2 mb-6"></div>
+            <div className="space-y-3">
+              <div className="h-4 bg-gray-200 rounded"></div>
+              <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+              <div className="h-4 bg-gray-200 rounded w-4/6"></div>
+            </div>
+          </div>
+          <div className="lg:col-span-1">
+            <div className="h-48 bg-gray-200 rounded-2xl"></div>
+          </div>
+        </div>
       </div>
     );
   }

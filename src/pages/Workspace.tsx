@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { doc, getDoc, addDoc, updateDoc, collection, query, where, getDocs, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, updateDoc, addDoc, collection, query, where, getDocs, serverTimestamp, getDocFromCache, getDocFromServer } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -65,8 +65,17 @@ export default function Workspace() {
   async function loadSimulationAndCreateSubmission() {
     if (!id || !profile) return;
     try {
-      // Load simulation
-      const simDoc = await getDoc(doc(db, "simulations", id));
+      // Try cache first for instant load
+      let simDoc;
+      try {
+        simDoc = await getDocFromCache(doc(db, "simulations", id));
+        console.log("Loaded from cache!");
+      } catch {
+        // If not in cache, fetch from server
+        simDoc = await getDocFromServer(doc(db, "simulations", id));
+        console.log("Loaded from server");
+      }
+      
       if (!simDoc.exists()) {
         setError("Simulation not found");
         return;
