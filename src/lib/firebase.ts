@@ -19,6 +19,7 @@ export const db = initializeFirestore(app, {
   cacheSizeBytes: CACHE_SIZE_UNLIMITED,
   experimentalForceLongPolling: false,
   experimentalAutoDetectLongPolling: true,
+  ignoreUndefinedProperties: true,
 });
 
 export const googleProvider = new GoogleAuthProvider();

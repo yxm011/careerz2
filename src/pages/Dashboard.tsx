@@ -50,11 +50,17 @@ export default function Dashboard() {
   async function loadUserData() {
     if (!profile) return;
     try {
+      const timeoutId = setTimeout(() => {
+        console.warn("Dashboard query taking longer than expected, retrying...");
+      }, 3000);
+
       const subsQuery = query(
         collection(db, "submissions"),
         where("userId", "==", profile.uid)
       );
       const snap = await getDocs(subsQuery);
+      clearTimeout(timeoutId);
+      
       const data = snap.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),

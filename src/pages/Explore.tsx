@@ -36,12 +36,13 @@ export default function Explore() {
 
   async function loadSimulations() {
     try {
-      // Set a timeout to show error if taking too long
+      // Set a timeout to auto-retry if taking too long
       const timeoutId = setTimeout(() => {
         if (loading) {
-          console.warn("Firestore query taking longer than expected...");
+          console.warn("Firestore query taking longer than expected, forcing refresh...");
+          window.location.reload();
         }
-      }, 5000);
+      }, 8000);
 
       // Load all simulations and filter in memory
       const snap = await getDocs(collection(db, "simulations"));
@@ -56,6 +57,11 @@ export default function Explore() {
       setSimulations(data);
     } catch (error) {
       console.error("Failed to load simulations:", error);
+      // Auto-retry on error
+      setTimeout(() => {
+        console.log("Retrying...");
+        window.location.reload();
+      }, 1000);
     } finally {
       setLoading(false);
     }
