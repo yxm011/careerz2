@@ -51,6 +51,7 @@ export default function Workspace() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [isResuming, setIsResuming] = useState(false);
+  const [dragDropMatches, setDragDropMatches] = useState<Record<string, Record<string, string>>>({});
 
   useEffect(() => {
     // Redirect to login if not authenticated
@@ -180,6 +181,26 @@ export default function Workspace() {
           // Auto-grade multiple choice
           if (answers[block.id] === String(block.correctAnswer)) {
             earnedPoints += 1;
+          }
+        } else if (block.type === "drag_drop" && block.correctMatches) {
+          // Auto-grade drag & drop
+          try {
+            const userMatches = JSON.parse(answers[block.id] || "{}");
+            let correctCount = 0;
+            let totalMatches = Object.keys(block.correctMatches).length;
+            
+            Object.entries(block.correctMatches).forEach(([item, correctCategory]) => {
+              // Find which category the user put this item in
+              const userCategory = Object.entries(userMatches).find(([cat, itm]) => itm === item)?.[0];
+              if (userCategory === correctCategory) {
+                correctCount++;
+              }
+            });
+            
+            // Award partial credit based on correct matches
+            earnedPoints += totalMatches > 0 ? (correctCount / totalMatches) : 0;
+          } catch {
+            // If parsing fails, no points
           }
         } else if (answers[block.id]) {
           // Other blocks: give credit if answered
@@ -474,32 +495,123 @@ export default function Workspace() {
                 {block.type === "drag_drop" && (
                   <div className="space-y-4">
                     <p className="font-medium text-gray-900">{block.content}</p>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-6">
+                      {/* Items to drag */}
                       <div className="space-y-2">
-                        <p className="text-xs font-semibold text-gray-600 mb-2">Items:</p>
-                        {block.items?.map((item, i) => (
+                        <p className="text-xs font-semibold text-gray-600 mb-2">Drag items to categories →</p>
+                        {block.items?.filter(item => {
+                          // Only show items that haven't been matched yet
+                          const blockMatches = dragDropMatches[block.id] || {};
+                          return !Object.values(blockMatches).includes(item);
+                        }).map((item, i) => (
                           <div
                             key={i}
-                            className="p-3 bg-white border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 cursor-move hover:border-primary transition"
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData("text/plain", item);
+                              e.currentTarget.classList.add("opacity-50");
+                            }}
+                            onDragEnd={(e) => {
+                              e.currentTarget.classList.remove("opacity-50");
+                            }}
+                            className="p-3 bg-white border-2 border-gray-300 rounded-lg text-sm font-medium text-gray-700 cursor-move hover:border-primary hover:shadow-md transition"
                           >
                             {item}
                           </div>
                         ))}
+                        {block.items?.filter(item => {
+                          const blockMatches = dragDropMatches[block.id] || {};
+                          return !Object.values(blockMatches).includes(item);
+                        }).length === 0 && (
+                          <p className="text-xs text-gray-400 italic py-4">All items matched! ✓</p>
+                        )}
                       </div>
-                      <div className="space-y-2">
+
+                      {/* Categories to drop into */}
+                      <div className="space-y-3">
                         <p className="text-xs font-semibold text-gray-600 mb-2">Categories:</p>
-                        {block.categories?.map((category, i) => (
-                          <div key={i} className="p-3 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg min-h-[60px]">
-                            <p className="text-xs font-semibold text-gray-600 mb-2">{category}</p>
-                          </div>
-                        ))}
+                        {block.categories?.map((category, i) => {
+                          const blockMatches = dragDropMatches[block.id] || {};
+                          const itemsInCategory = Object.entries(blockMatches)
+                            .filter(([_, item]) => _ === category)
+                            .map(([_, item]) => item);
+                          
+                          return (
+                            <div
+                              key={i}
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                e.currentTarget.classList.add("border-primary", "bg-blue-50");
+                              }}
+                              onDragLeave={(e) => {
+                                e.currentTarget.classList.remove("border-primary", "bg-blue-50");
+                              }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                e.currentTarget.classList.remove("border-primary", "bg-blue-50");
+                                const item = e.dataTransfer.getData("text/plain");
+                                
+                                // Update matches
+                                const newMatches = {
+                                  ...dragDropMatches,
+                                  [block.id]: {
+                                    ...(dragDropMatches[block.id] || {}),
+                                    [category]: item,
+                                  }
+                                };
+                                setDragDropMatches(newMatches);
+                                
+                                // Save to answers as JSON
+                                saveAnswer(block.id, JSON.stringify(newMatches[block.id]));
+                              }}
+                              className="p-4 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg min-h-[80px] transition"
+                            >
+                              <p className="text-xs font-semibold text-gray-700 mb-2">{category}</p>
+                              {itemsInCategory.map((item, j) => (
+                                <div
+                                  key={j}
+                                  className="mt-2 p-2 bg-white border border-gray-200 rounded text-xs font-medium text-gray-700 flex items-center justify-between"
+                                >
+                                  <span>{item}</span>
+                                  <button
+                                    onClick={() => {
+                                      // Remove item from category
+                                      const newBlockMatches = { ...(dragDropMatches[block.id] || {}) };
+                                      delete newBlockMatches[category];
+                                      const newMatches = {
+                                        ...dragDropMatches,
+                                        [block.id]: newBlockMatches,
+                                      };
+                                      setDragDropMatches(newMatches);
+                                      saveAnswer(block.id, JSON.stringify(newBlockMatches));
+                                    }}
+                                    className="text-red-500 hover:text-red-700 text-xs"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ))}
+                              {itemsInCategory.length === 0 && (
+                                <p className="text-xs text-gray-400 italic">Drop here</p>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
-                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                      <p className="text-xs text-blue-700">
-                        💡 <strong>Note:</strong> Full drag & drop functionality coming soon! For now, this is a preview of the matching exercise.
-                      </p>
-                    </div>
+                    
+                    {/* Show feedback after all items matched */}
+                    {block.items && block.items.length > 0 && 
+                     block.items.filter(item => {
+                       const blockMatches = dragDropMatches[block.id] || {};
+                       return !Object.values(blockMatches).includes(item);
+                     }).length === 0 && (
+                      <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                        <p className="text-sm text-green-800 font-medium">
+                          ✓ All items matched! Your answers have been saved.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 
