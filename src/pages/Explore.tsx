@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { useLanguage } from "@/i18n/LanguageContext";
 import { Search, Clock, Building2, BarChart3 } from "lucide-react";
 
 interface Simulation {
@@ -24,7 +23,6 @@ const diffColors: Record<string, string> = {
 };
 
 export default function Explore() {
-  const { t } = useLanguage();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
   const [simulations, setSimulations] = useState<Simulation[]>([]);
@@ -74,18 +72,28 @@ export default function Explore() {
     return matchSearch && matchCat;
   });
 
+  // Prefetch simulation data when user hovers
+  async function prefetchSimulation(simId: string) {
+    try {
+      await getDoc(doc(db, "simulations", simId));
+      console.log(`Prefetched simulation ${simId}`);
+    } catch (error) {
+      console.error("Prefetch failed:", error);
+    }
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-10">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">{t("explore.title")}</h1>
-        <p className="text-gray-500 mt-2">{t("explore.subtitle")}</p>
+        <h1 className="text-3xl font-bold text-gray-900">Explore Simulations</h1>
+        <p className="text-gray-500 mt-2">Discover and practice real-world job simulations</p>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 mb-8">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
-            placeholder={t("explore.search")}
+            placeholder="Search simulations..."
             className="w-full pl-9 pr-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-200 bg-gray-50 text-sm"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -102,7 +110,7 @@ export default function Explore() {
                   : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
               }`}
             >
-              {cat === "All" ? t("explore.all") : cat}
+              {cat === "All" ? "All" : cat}
             </button>
           ))}
         </div>
@@ -128,7 +136,7 @@ export default function Explore() {
       ) : filtered.length === 0 ? (
         <div className="text-center py-20">
           <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900">{t("explore.empty")}</h3>
+          <h3 className="text-lg font-medium text-gray-900">No simulations found</h3>
         </div>
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -136,6 +144,7 @@ export default function Explore() {
             <Link
               key={sim.id}
               to={`/sim/${sim.id}`}
+              onMouseEnter={() => prefetchSimulation(sim.id)}
               className="border border-gray-100 rounded-2xl bg-white p-5 hover:shadow-md transition-shadow no-underline group"
             >
               <div className="flex items-start justify-between mb-3">
@@ -160,7 +169,7 @@ export default function Explore() {
                   {sim.category}
                 </span>
                 <span className="text-sm font-medium text-primary">
-                  {t("explore.view")} →
+                  View Details →
                 </span>
               </div>
             </Link>
