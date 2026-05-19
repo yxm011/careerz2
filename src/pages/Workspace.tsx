@@ -178,59 +178,61 @@ export default function Workspace() {
   async function handleSubmit() {
     if (!submissionId || !simulation) return;
     setSubmitting(true);
-    try {
-      // Calculate score with auto-grading for multiple choice
-      let totalPoints = 0;
-      let earnedPoints = 0;
+    
+    // Calculate score with auto-grading for multiple choice
+    let totalPoints = 0;
+    let earnedPoints = 0;
+    
+    simulation.blocks.forEach(block => {
+      totalPoints += 1;
       
-      simulation.blocks.forEach(block => {
-        totalPoints += 1;
-        
-        if (block.type === "multiple_choice" && block.correctAnswer !== undefined) {
-          // Auto-grade multiple choice
-          if (answers[block.id] === String(block.correctAnswer)) {
-            earnedPoints += 1;
-          }
-        } else if (block.type === "drag_drop" && block.correctMatches) {
-          // Auto-grade drag & drop
-          try {
-            const userMatches = JSON.parse(answers[block.id] || "{}");
-            let correctCount = 0;
-            let totalMatches = Object.keys(block.correctMatches).length;
-            
-            Object.entries(block.correctMatches).forEach(([item, correctCategory]) => {
-              // Find which category the user put this item in
-              const userCategory = Object.entries(userMatches).find(([cat, itm]) => itm === item)?.[0];
-              if (userCategory === correctCategory) {
-                correctCount++;
-              }
-            });
-            
-            // Award partial credit based on correct matches
-            earnedPoints += totalMatches > 0 ? (correctCount / totalMatches) : 0;
-          } catch {
-            // If parsing fails, no points
-          }
-        } else if (answers[block.id]) {
-          // Other blocks: give credit if answered
+      if (block.type === "multiple_choice" && block.correctAnswer !== undefined) {
+        // Auto-grade multiple choice
+        if (answers[block.id] === String(block.correctAnswer)) {
           earnedPoints += 1;
         }
-      });
-      
-      const score = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
-      
+      } else if (block.type === "drag_drop" && block.correctMatches) {
+        // Auto-grade drag & drop
+        try {
+          const userMatches = JSON.parse(answers[block.id] || "{}");
+          let correctCount = 0;
+          let totalMatches = Object.keys(block.correctMatches).length;
+          
+          Object.entries(block.correctMatches).forEach(([item, correctCategory]) => {
+            // Find which category the user put this item in
+            const userCategory = Object.entries(userMatches).find(([cat, itm]) => itm === item)?.[0];
+            if (userCategory === correctCategory) {
+              correctCount++;
+            }
+          });
+          
+          // Award partial credit based on correct matches
+          earnedPoints += totalMatches > 0 ? (correctCount / totalMatches) : 0;
+        } catch {
+          // If parsing fails, no points
+        }
+      } else if (answers[block.id]) {
+        // Other blocks: give credit if answered
+        earnedPoints += 1;
+      }
+    });
+    
+    const score = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
+    
+    // Navigate immediately (optimistic UI)
+    navigate(`/complete/${submissionId}`);
+    
+    // Update in background
+    try {
       await updateDoc(doc(db, "submissions", submissionId), {
         status: "completed",
         progress: 100,
         score,
         submittedAt: serverTimestamp(),
       });
-      
-      navigate(`/complete/${submissionId}`);
     } catch (err: any) {
-      setError(err.message ?? "Failed to submit");
-    } finally {
-      setSubmitting(false);
+      console.error("Failed to submit:", err);
+      // Already navigated, so just log error
     }
   }
 

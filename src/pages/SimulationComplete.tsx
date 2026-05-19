@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, getDocFromCache, getDocFromServer } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
 import { Trophy, Share2, Download, ArrowRight, CheckCircle2 } from "lucide-react";
@@ -26,7 +26,16 @@ export default function SimulationComplete() {
   async function loadSubmission() {
     if (!submissionId || !profile) return;
     try {
-      const snap = await getDoc(doc(db, "submissions", submissionId));
+      // Try cache first for instant display
+      let snap;
+      try {
+        snap = await getDocFromCache(doc(db, "submissions", submissionId));
+        console.log("Completion page loaded from cache!");
+      } catch {
+        snap = await getDocFromServer(doc(db, "submissions", submissionId));
+        console.log("Completion page loaded from server");
+      }
+      
       if (!snap.exists()) {
         navigate("/dashboard");
         return;
