@@ -7,9 +7,12 @@ import { ArrowLeft, Save, Eye, Plus, Trash2, GripVertical } from "lucide-react";
 
 interface Block {
   id: string;
-  type: "text" | "question" | "code" | "file_upload";
+  type: "text" | "question" | "code" | "multiple_choice" | "file_upload";
   content: string;
   order: number;
+  options?: string[];
+  correctAnswer?: number;
+  modelAnswer?: string;
 }
 
 interface Simulation {
@@ -124,6 +127,14 @@ export default function CompanySimEdit() {
     });
   }
 
+  function updateBlockField(id: string, field: string, value: any) {
+    if (!simulation) return;
+    setSimulation({
+      ...simulation,
+      blocks: simulation.blocks.map((b) => (b.id === id ? { ...b, [field]: value } : b)),
+    });
+  }
+
   function deleteBlock(id: string) {
     if (!simulation) return;
     setSimulation({
@@ -230,6 +241,12 @@ export default function CompanySimEdit() {
             >
               + Code
             </button>
+            <button
+              onClick={() => addBlock("multiple_choice")}
+              className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1.5 rounded-lg transition font-medium"
+            >
+              + Multiple Choice
+            </button>
           </div>
         </div>
 
@@ -253,13 +270,61 @@ export default function CompanySimEdit() {
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
-                <textarea
-                  value={block.content}
-                  onChange={(e) => updateBlock(block.id, e.target.value)}
-                  placeholder={`Enter ${block.type} content...`}
-                  rows={block.type === "text" ? 3 : 5}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white text-sm resize-none"
-                />
+                {block.type === "multiple_choice" ? (
+                  <div className="space-y-3">
+                    <textarea
+                      value={block.content}
+                      onChange={(e) => updateBlock(block.id, e.target.value)}
+                      placeholder="Enter question..."
+                      rows={2}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white text-sm resize-none"
+                    />
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-gray-600">Options:</label>
+                      {(block.options || ["", "", "", ""]).map((option, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name={`correct-${block.id}`}
+                            checked={block.correctAnswer === i}
+                            onChange={() => updateBlockField(block.id, "correctAnswer", i)}
+                            className="w-4 h-4 text-blue-600"
+                          />
+                          <input
+                            type="text"
+                            value={option}
+                            onChange={(e) => {
+                              const newOptions = [...(block.options || ["", "", "", ""])];
+                              newOptions[i] = e.target.value;
+                              updateBlockField(block.id, "options", newOptions);
+                            }}
+                            placeholder={`Option ${i + 1}`}
+                            className="flex-1 px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white text-sm"
+                          />
+                        </div>
+                      ))}
+                      <p className="text-xs text-gray-500 mt-1">Select the correct answer with the radio button</p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 block mb-1">Model Answer (optional):</label>
+                      <textarea
+                        value={block.modelAnswer || ""}
+                        onChange={(e) => updateBlockField(block.id, "modelAnswer", e.target.value)}
+                        placeholder="Explain why this is the correct answer..."
+                        rows={2}
+                        className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white text-sm resize-none"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <textarea
+                    value={block.content}
+                    onChange={(e) => updateBlock(block.id, e.target.value)}
+                    placeholder={`Enter ${block.type} content...`}
+                    rows={block.type === "text" ? 3 : 5}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white text-sm resize-none"
+                  />
+                )}
               </div>
             ))}
           </div>

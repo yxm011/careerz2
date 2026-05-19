@@ -16,6 +16,9 @@ interface Block {
   type: string;
   content: string;
   order: number;
+  options?: string[];
+  correctAnswer?: number;
+  modelAnswer?: string;
 }
 
 interface Simulation {
@@ -162,8 +165,25 @@ export default function Workspace() {
     if (!submissionId || !simulation) return;
     setSubmitting(true);
     try {
-      // Calculate simple score (percentage of blocks completed)
-      const score = Math.round((completedBlocks.size / simulation.blocks.length) * 100);
+      // Calculate score with auto-grading for multiple choice
+      let totalPoints = 0;
+      let earnedPoints = 0;
+      
+      simulation.blocks.forEach(block => {
+        totalPoints += 1;
+        
+        if (block.type === "multiple_choice" && block.correctAnswer !== undefined) {
+          // Auto-grade multiple choice
+          if (answers[block.id] === String(block.correctAnswer)) {
+            earnedPoints += 1;
+          }
+        } else if (answers[block.id]) {
+          // Other blocks: give credit if answered
+          earnedPoints += 1;
+        }
+      });
+      
+      const score = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
       
       await updateDoc(doc(db, "submissions", submissionId), {
         status: "completed",
@@ -333,6 +353,71 @@ export default function Workspace() {
                       rows={12}
                       className="w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-200 bg-gray-900 text-green-400 text-sm resize-none font-mono"
                     />
+                  </div>
+                )}
+
+                {/* Multiple Choice Block */}
+                {block.type === "multiple_choice" && (
+                  <div className="space-y-4">
+                    <p className="font-medium text-gray-900 mb-4">{block.content}</p>
+                    <div className="space-y-2">
+                      {block.options?.map((option, i) => {
+                        const isSelected = answers[block.id] === String(i);
+                        const isCorrect = block.correctAnswer === i;
+                        const hasAnswered = answers[block.id] !== undefined;
+                        
+                        return (
+                          <button
+                            key={i}
+                            onClick={() => saveAnswer(block.id, String(i))}
+                            disabled={hasAnswered}
+                            className={`w-full text-left flex items-center gap-3 p-4 rounded-xl border transition text-sm ${
+                              hasAnswered && isSelected && isCorrect
+                                ? "border-green-500 bg-green-50"
+                                : hasAnswered && isSelected && !isCorrect
+                                ? "border-red-500 bg-red-50"
+                                : hasAnswered && isCorrect
+                                ? "border-green-300 bg-green-50/50"
+                                : isSelected
+                                ? "border-primary bg-blue-50"
+                                : "border-gray-200 hover:bg-gray-50 bg-white"
+                            } ${hasAnswered ? "cursor-not-allowed" : "cursor-pointer"}`}
+                          >
+                            <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                              hasAnswered && isSelected && isCorrect
+                                ? "border-green-500"
+                                : hasAnswered && isSelected && !isCorrect
+                                ? "border-red-500"
+                                : isSelected
+                                ? "border-primary"
+                                : "border-gray-300"
+                            }`}>
+                              {isSelected && (
+                                <span className={`w-2.5 h-2.5 rounded-full ${
+                                  hasAnswered && isCorrect
+                                    ? "bg-green-500"
+                                    : hasAnswered && !isCorrect
+                                    ? "bg-red-500"
+                                    : "bg-primary"
+                                }`} />
+                              )}
+                            </span>
+                            <span className="flex-1">{option}</span>
+                            {hasAnswered && isCorrect && (
+                              <CheckCircle2 className="w-5 h-5 text-green-500" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    
+                    {/* Show model answer after answering */}
+                    {answers[block.id] !== undefined && block.modelAnswer && (
+                      <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                        <p className="text-xs font-semibold text-blue-900 mb-2">💡 Model Answer:</p>
+                        <p className="text-sm text-blue-800">{block.modelAnswer}</p>
+                      </div>
+                    )}
                   </div>
                 )}
 
