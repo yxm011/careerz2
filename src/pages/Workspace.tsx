@@ -217,7 +217,7 @@ export default function Workspace() {
         submittedAt: serverTimestamp(),
       });
       
-      navigate("/dashboard");
+      navigate(`/complete/${submissionId}`);
     } catch (err: any) {
       setError(err.message ?? "Failed to submit");
     } finally {
