@@ -17,6 +17,8 @@ export const auth = getAuth(app);
 // Initialize Firestore with performance settings
 export const db = initializeFirestore(app, {
   cacheSizeBytes: CACHE_SIZE_UNLIMITED,
+  experimentalForceLongPolling: false,
+  experimentalAutoDetectLongPolling: true,
 });
 
 export const googleProvider = new GoogleAuthProvider();

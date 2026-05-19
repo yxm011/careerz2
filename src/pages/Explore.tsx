@@ -36,8 +36,17 @@ export default function Explore() {
 
   async function loadSimulations() {
     try {
-      // Load all simulations and filter in memory (temporary - add index for production)
+      // Set a timeout to show error if taking too long
+      const timeoutId = setTimeout(() => {
+        if (loading) {
+          console.warn("Firestore query taking longer than expected...");
+        }
+      }, 5000);
+
+      // Load all simulations and filter in memory
       const snap = await getDocs(collection(db, "simulations"));
+      clearTimeout(timeoutId);
+      
       const data = snap.docs
         .map(doc => ({
           id: doc.id,
@@ -94,54 +103,63 @@ export default function Explore() {
       </div>
 
       {loading ? (
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="border border-gray-100 rounded-2xl bg-white p-6 animate-pulse">
+              <div className="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
+              <div className="h-3 bg-gray-200 rounded w-1/2 mb-6"></div>
+              <div className="space-y-2">
+                <div className="h-3 bg-gray-200 rounded"></div>
+                <div className="h-3 bg-gray-200 rounded w-5/6"></div>
+              </div>
+              <div className="mt-4 flex gap-2">
+                <div className="h-6 bg-gray-200 rounded w-16"></div>
+                <div className="h-6 bg-gray-200 rounded w-20"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="text-center py-20">
-          <p className="text-gray-400">Loading simulations...</p>
+          <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900">{t("explore.empty")}</h3>
         </div>
       ) : (
-        <>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filtered.map((sim) => (
-              <Link
-                key={sim.id}
-                to={`/sim/${sim.id}`}
-                className="border border-gray-100 rounded-2xl bg-white p-5 hover:shadow-md transition-shadow no-underline group"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-lg ${diffColors[sim.difficulty] || "bg-gray-100 text-gray-600"}`}>
-                    {sim.difficulty}
-                  </span>
-                  <span className="flex items-center gap-1 text-xs text-gray-400">
-                    <Clock className="w-3 h-3" />
-                    {sim.duration} min
-                  </span>
-                </div>
-                <h3 className="font-semibold text-lg text-gray-900 mb-1 group-hover:text-primary transition-colors">
-                  {sim.title}
-                </h3>
-                <div className="flex items-center gap-1.5 text-sm text-gray-400 mb-3">
-                  <Building2 className="w-3.5 h-3.5" />
-                  {sim.companyName || "Unknown Company"}
-                </div>
-                <p className="text-sm text-gray-500 line-clamp-2">{sim.description}</p>
-                <div className="mt-4 flex items-center justify-between">
-                  <span className="text-xs font-medium px-2 py-0.5 rounded-lg border border-gray-200 text-gray-500 capitalize">
-                    {sim.category}
-                  </span>
-                  <span className="text-sm font-medium text-primary">
-                    {t("explore.view")} →
-                  </span>
-                </div>
-              </Link>
-            ))}
-          </div>
-
-          {filtered.length === 0 && !loading && (
-            <div className="text-center py-20">
-              <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900">{t("explore.empty")}</h3>
-            </div>
-          )}
-        </>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filtered.map((sim) => (
+            <Link
+              key={sim.id}
+              to={`/sim/${sim.id}`}
+              className="border border-gray-100 rounded-2xl bg-white p-5 hover:shadow-md transition-shadow no-underline group"
+            >
+              <div className="flex items-start justify-between mb-3">
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-lg ${diffColors[sim.difficulty] || "bg-gray-100 text-gray-600"}`}>
+                  {sim.difficulty}
+                </span>
+                <span className="flex items-center gap-1 text-xs text-gray-400">
+                  <Clock className="w-3 h-3" />
+                  {sim.duration} min
+                </span>
+              </div>
+              <h3 className="font-semibold text-lg text-gray-900 mb-1 group-hover:text-primary transition-colors">
+                {sim.title}
+              </h3>
+              <div className="flex items-center gap-1.5 text-sm text-gray-400 mb-3">
+                <Building2 className="w-3.5 h-3.5" />
+                {sim.companyName || "Unknown Company"}
+              </div>
+              <p className="text-sm text-gray-500 line-clamp-2">{sim.description}</p>
+              <div className="mt-4 flex items-center justify-between">
+                <span className="text-xs font-medium px-2 py-0.5 rounded-lg border border-gray-200 text-gray-500 capitalize">
+                  {sim.category}
+                </span>
+                <span className="text-sm font-medium text-primary">
+                  {t("explore.view")} →
+                </span>
+              </div>
+            </Link>
+          ))}
+        </div>
       )}
     </div>
   );
