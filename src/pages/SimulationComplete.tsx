@@ -74,8 +74,116 @@ export default function SimulationComplete() {
   }
 
   function downloadCertificate() {
-    // Placeholder for certificate download
-    alert("Certificate download coming soon!");
+    if (!submission || !profile) return;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = 1400;
+    canvas.height = 1000;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // Background
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, 1400, 1000);
+
+    // Border
+    ctx.strokeStyle = "#e5e7eb";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(40, 40, 1320, 920);
+
+    // Inner decorative border
+    ctx.strokeStyle = "#6366f1";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(60, 60, 1280, 880);
+
+    // Corner accents
+    const cornerSize = 30;
+    ctx.fillStyle = "#6366f1";
+    [[60, 60], [1340 - cornerSize, 60], [60, 940 - cornerSize], [1340 - cornerSize, 940 - cornerSize]].forEach(([x, y]) => {
+      ctx.fillRect(x, y, cornerSize, cornerSize);
+    });
+
+    // Header
+    ctx.fillStyle = "#6366f1";
+    ctx.font = "bold 18px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("CAREERZ.AZ", 700, 140);
+
+    // Title
+    ctx.fillStyle = "#111827";
+    ctx.font = "bold 52px system-ui, sans-serif";
+    ctx.fillText("Certificate of Completion", 700, 220);
+
+    // Divider
+    ctx.strokeStyle = "#d1d5db";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(400, 260);
+    ctx.lineTo(1000, 260);
+    ctx.stroke();
+
+    // Presented to
+    ctx.fillStyle = "#6b7280";
+    ctx.font = "20px system-ui, sans-serif";
+    ctx.fillText("This certificate is proudly presented to", 700, 320);
+
+    // Name
+    ctx.fillStyle = "#111827";
+    ctx.font = "bold 44px system-ui, sans-serif";
+    ctx.fillText(profile.displayName || profile.email, 700, 390);
+
+    // Completion text
+    ctx.fillStyle = "#6b7280";
+    ctx.font = "20px system-ui, sans-serif";
+    ctx.fillText("for successfully completing the simulation", 700, 460);
+
+    // Simulation title
+    ctx.fillStyle = "#4f46e5";
+    ctx.font = "bold 36px system-ui, sans-serif";
+    ctx.fillText(`"${submission.simulationTitle}"`, 700, 520);
+
+    // Company
+    ctx.fillStyle = "#6b7280";
+    ctx.font = "20px system-ui, sans-serif";
+    ctx.fillText(`by ${submission.companyName}`, 700, 570);
+
+    // Score badge
+    ctx.fillStyle = "#f0fdf4";
+    ctx.beginPath();
+    ctx.roundRect(580, 610, 240, 80, 16);
+    ctx.fill();
+    ctx.strokeStyle = "#86efac";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(580, 610, 240, 80, 16);
+    ctx.stroke();
+
+    ctx.fillStyle = "#166534";
+    ctx.font = "bold 16px system-ui, sans-serif";
+    ctx.fillText("SCORE", 700, 640);
+    ctx.font = "bold 32px system-ui, sans-serif";
+    ctx.fillText(`${submission.score}%`, 700, 675);
+
+    // Date
+    const dateStr = new Date().toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    ctx.fillStyle = "#9ca3af";
+    ctx.font = "18px system-ui, sans-serif";
+    ctx.fillText(dateStr, 700, 760);
+
+    // Footer
+    ctx.fillStyle = "#d1d5db";
+    ctx.font = "14px system-ui, sans-serif";
+    ctx.fillText("Verified by Careerz.az — Career Simulation Platform", 700, 900);
+
+    // Download
+    const link = document.createElement("a");
+    link.download = `certificate-${submission.simulationTitle.replace(/\s+/g, "-").toLowerCase()}.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
   }
 
   if (loading) {

@@ -91,7 +91,7 @@ export default function Navbar() {
     <header className="sticky top-0 z-50 w-full border-b border-gray-100 bg-white/95 backdrop-blur">
       <div className="max-w-7xl mx-auto flex h-16 items-center justify-between px-4">
         {/* Logo */}
-        <Link to={profile ? (role === "company" ? "/company" : role === "admin" ? "/admin" : "/dashboard") : "/"} className="flex items-center gap-2">
+        <Link to="/" className="flex items-center gap-2">
           <Briefcase className="w-6 h-6 text-primary" />
           <span className="text-xl font-bold tracking-tight text-gray-900">
             Careerz.az
